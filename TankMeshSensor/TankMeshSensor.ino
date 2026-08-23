@@ -21,13 +21,13 @@
 #include "TankMeshProtocol.h"
 
 // ---------------- Hardware config — adjust to your wiring ----------------
-#define ANALOG_PIN            36     // tank level sense, same pin as v2
+#define ANALOG_PIN            36     // tank level sense, same pin as v2, pin 36 on the esp32S, GPIO4 in the c3 supermini
 #define BATTERY_MONITORING    1      // set to 0 if this sensor runs off mains/USB only
 #define BATTERY_ADC_PIN       39     // ADC pin reading the battery divider (VN on most devkits)
 #define BATTERY_DIVIDER_RATIO 2.0f   // (R1+R2)/R2 for your divider — 2.0 = equal resistors
-#define ADC_VREF_MV           3300.0f
+#define ADC_VREF_MV           4300.0f
 
-#define DEFAULT_SLEEP_SEC     60
+#define DEFAULT_SLEEP_SEC     10
 #define CONNECT_WINDOW_MS     15000  // minimum time spent connectable after waking
 #define MAX_SESSION_MS        30000  // hard cap on total awake time even if a client lingers
 
@@ -74,6 +74,8 @@ void loadSettings() {
   prefs.begin("tm_sys", true);
   settingsVersion = prefs.getUChar("ver", 0);
   prefs.end();
+
+  Serial.printf("[Boot] loaded prefix='%s' sleepIntervalSec=%u settingsVersion=%u\n", mesh.prefix, mesh.sleepIntervalSec, settingsVersion);
 }
 
 void saveNameColor() {
@@ -107,21 +109,32 @@ void bumpSettingsVersion() {
 
 // ---------------- BLE server callbacks ----------------
 class ServerCallbacks : public BLEServerCallbacks {
-  void onConnect(BLEServer *s) override { deviceConnected = true; }
+  void onConnect(BLEServer *s) override {
+    deviceConnected = true;
+    Serial.println("[BLE] client connected");
+  }
   void onDisconnect(BLEServer *s) override {
     deviceConnected = false;
+    Serial.println("[BLE] client disconnected");
     BLEDevice::startAdvertising(); // stay available in case another client wants in
   }
 };
 
 class NameColorCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *c) override {
-    String v = c->getValue();
-    if (v.length() == sizeof(TankMeshNameColor)) {
-      memcpy(&nameColor, v.c_str(), sizeof(TankMeshNameColor));
+    Serial.printf("[NameColorChar] write received: %d bytes (expected %d)\n", c->getLength(), (int)sizeof(TankMeshNameColor));
+    // getData()/getLength() instead of the String-based getValue() — the
+    // latter truncates at the first embedded 0x00 byte (e.g. right after a
+    // short name string, before colorRGB), which silently dropped writes
+    // whenever the padded field wasn't exactly full length.
+    if (c->getLength() == sizeof(TankMeshNameColor)) {
+      memcpy(&nameColor, c->getData(), sizeof(TankMeshNameColor));
       nameColor.name[15] = '\0';
       saveNameColor();
       bumpSettingsVersion();
+      Serial.printf("[NameColorChar] applied: name='%s' color=0x%06X\n", nameColor.name, nameColor.colorRGB);
+    } else {
+      Serial.println("[NameColorChar] length mismatch — write ignored");
     }
   }
   void onRead(BLECharacteristic *c) override {
@@ -131,11 +144,14 @@ class NameColorCallbacks : public BLECharacteristicCallbacks {
 
 class CalCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *c) override {
-    String v = c->getValue();
-    if (v.length() == sizeof(TankMeshCal)) {
-      memcpy(&cal, v.c_str(), sizeof(TankMeshCal));
+    Serial.printf("[CalChar] write received: %d bytes (expected %d)\n", c->getLength(), (int)sizeof(TankMeshCal));
+    if (c->getLength() == sizeof(TankMeshCal)) {
+      memcpy(&cal, c->getData(), sizeof(TankMeshCal));
       saveCal();
       bumpSettingsVersion();
+      Serial.printf("[CalChar] applied: autoCal=%u min=%u max=%u\n", cal.autoCalEnabled, cal.adcMin, cal.adcMax);
+    } else {
+      Serial.println("[CalChar] length mismatch — write ignored");
     }
   }
   void onRead(BLECharacteristic *c) override {
@@ -145,13 +161,16 @@ class CalCallbacks : public BLECharacteristicCallbacks {
 
 class MeshCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *c) override {
-    String v = c->getValue();
-    if (v.length() == sizeof(TankMeshMesh)) {
-      memcpy(&mesh, v.c_str(), sizeof(TankMeshMesh));
+    Serial.printf("[MeshChar] write received: %d bytes (expected %d)\n", c->getLength(), (int)sizeof(TankMeshMesh));
+    if (c->getLength() == sizeof(TankMeshMesh)) {
+      memcpy(&mesh, c->getData(), sizeof(TankMeshMesh));
       mesh.prefix[15] = '\0';
       if (mesh.sleepIntervalSec < 5) mesh.sleepIntervalSec = 5; // safety floor
       saveMesh();
       bumpSettingsVersion();
+      Serial.printf("[MeshChar] applied: prefix='%s' sleepIntervalSec=%u\n", mesh.prefix, mesh.sleepIntervalSec);
+    } else {
+      Serial.println("[MeshChar] length mismatch — write ignored");
     }
   }
   void onRead(BLECharacteristic *c) override {
@@ -264,6 +283,9 @@ void goToSleep(unsigned long activeMs) {
   uint64_t sleepUs  = (uint64_t)mesh.sleepIntervalSec * 1000000ULL;
   uint64_t activeUs = (uint64_t)activeMs * 1000ULL;
   uint64_t remainUs = (sleepUs > activeUs) ? (sleepUs - activeUs) : 1000000ULL;
+  Serial.printf("[Sleep] activeMs=%lu configuredSleepSec=%u sleepingForMs=%llu\n", activeMs, mesh.sleepIntervalSec, remainUs / 1000ULL);
+  Serial.flush();
+  delay(10); // give the UART time to actually push the line out before power-down
   esp_sleep_enable_timer_wakeup(remainUs);
   esp_deep_sleep_start();
 }
@@ -309,8 +331,16 @@ void setup() {
   svc->start();
   buildAndStartAdvertising(levelPercent, battMv);
 
+  // Scale the connectable window down for short sleep intervals — a fixed
+  // 15s window would otherwise dominate a 10s test cycle entirely, pushing
+  // the actual sleep time to the 1s safety floor in goToSleep() regardless
+  // of what sleepIntervalSec is set to. Floor of 3s keeps some realistic
+  // chance of being caught even at very short intervals.
+  unsigned long dynamicWindowMs = min((unsigned long)CONNECT_WINDOW_MS, (unsigned long)mesh.sleepIntervalSec * 1000UL / 2);
+  if (dynamicWindowMs < 3000) dynamicWindowMs = 3000;
+
   unsigned long windowStart = millis();
-  while ((millis() - windowStart < CONNECT_WINDOW_MS) || deviceConnected) {
+  while ((millis() - windowStart < dynamicWindowMs) || deviceConnected) {
     delay(50);
     if ((millis() - startMs) > MAX_SESSION_MS) break; // safety cap
   }
