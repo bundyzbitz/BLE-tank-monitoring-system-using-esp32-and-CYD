@@ -2,16 +2,33 @@
  
 a tank monitor system designed for boats and RVs etc.
 
-features
+FEATURES
 
-* up to 9 tanks (could expand but needed a limit somewhere)
-* sensors use analog input (rheostat/pressure/ultrasonic etc, as long as its an analog output)
-* sensors use BLE and deep sleep so can be run off a battery like a 18650 for descent time frames
-* choice of 1 or 2 screens or both.
-* supports 2.2" and 3.5" CYD displays (2.2 for portable and 3.5 for a fixed display)
-* android app will be coming but will be late in the development as I've not coded apps before
-* all settings will be done from either the app or through either screen via a http AP interface 
-* Screen idle Timout for the Portable unit, shuts the screen off after X seconds to save battery
+**Wireless Sensor Network**
+ * Up to 9 independent tank sensors per system, each uniquely identified — no manual addressing or DIP switches
+ * Battery-powered sensors with months-long runtime: deep sleep between readings, waking briefly on a configurable interval (default 60s, user-adjustable) to report and check for settings
+ * No WiFi on the sensors — BLE-only for lower power draw and simpler, more robust wireless range
+ * Self-calibrating — automatically learns each tank's empty/full range over time, with manual override and live raw sensor readout for hand-tuning
+ * Multi-installation support via group labels — several independent TankMesh systems (e.g. neighboring boats at a marina) can coexist without ever showing each other's tanks
+ * 
+**Displays**
+ * Two display formats: a 3.5" mains-style display and a 2.2" portable handheld, both running the same underlying system
+ * Modern dark-themed UI with per-tank custom color coding, consistent across every screen and the mobile-style web portal
+  *At-a-glance multi-tank overview — color-coded level bars for every tank on one screen
+ * Detailed per-tank view — large graphical tank-fill indicator plus live percentage, battery status, and packet count
+ * User-configurable viewing order — arrange tanks in whatever sequence makes sense for how each display is used
+ * Zero-App Setup & Configuration
+ * Entirely browser-based configuration — no app to install; connect to the display's own WiFi and configure from any phone or laptop
+ * Remote sensor configuration over Bluetooth — rename, recolor, recalibrate, and adjust every sensor's settings without physically accessing it
+ * Automatic sensor discovery — new sensors appear in the portal ready to be named and assigned
+
+**Power Management**
+ * Adjustable battery-saving screen timeout on the portable display — dims automatically when idle, wakes instantly on touch
+ * Sensor battery monitoring with on-screen percentage
+ * Fully configurable via the web portal — no code changes needed for day-to-day tuning
+ * Engineered for Reliability
+ * Dual-core architecture keeps the display responsive regardless of background wireless activity
+ * Resilient to radio interference between WiFi and Bluetooth running simultaneously
   
 sensors use a esp32S but you could use something like a esp32c3 supermini etc. only tested on the esp32S for now
 
