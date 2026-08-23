@@ -16,7 +16,7 @@ A wireless tank-level monitoring system built on ESP32, using Bluetooth Low Ener
 - Group-label isolation — multiple independent TankMesh installations can operate near each other (e.g. neighboring boats) without showing each other's tanks
 
 **Displays**
-- Two form factors sharing the same underlying system: a 3.5" mains-powered display and a 2.2"/2.4" battery-portable display
+- Two form factors sharing the same underlying system: a 3.5" mains-powered display and a 2.2"/2.4" battery-portable display (2.4" screen currently untested)
 - Dark-themed UI with per-tank custom colors, consistent across every screen and the web portal
 - Multi-tank overview with color-coded fill bars, and a detailed per-tank graphical view
 - User-configurable tank display order per screen
@@ -57,7 +57,7 @@ TankMeshMainDisplay/     3.5" display firmware
   TankMeshProtocol.h
   TankMeshSetupLogo.h     Embedded splash graphic for the setup screen
 
-TankMeshPortable/        2.2"/2.4" portable display firmware
+TankMeshPortable/        2.2"/2.4" portable display firmware, only 2.2" tested
   TankMeshPortable.ino
   TankMeshProtocol.h
   TankMeshSetupLogo.h
@@ -92,7 +92,7 @@ Each folder is a self-contained Arduino sketch — open the `.ino` file in Ardui
 
 ## License
 
-This project is currently shared for personal, non-commercial use. A commercial version may be released separately in the future. *(Replace this section with a specific license once chosen — e.g. [PolyForm Noncommercial](https://polyformproject.org/licenses/noncommercial/1.0.0/) or [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) are common choices for "free for personal use, commercial rights reserved" projects. This isn't legal advice — worth a quick read of a couple of options, or a proper license consult, before you rely on it commercially.)*
+This project is currently shared for personal, non-commercial use. A commercial version may be released separately in the future.  [PolyForm Noncommercial](https://polyformproject.org/licenses/noncommercial/1.0.0/) 
 
 ---
 
