@@ -16,6 +16,7 @@ A wireless tank-level monitoring system built on ESP32, using Bluetooth Low Ener
 - Group-label isolation — multiple independent TankMesh installations can operate near each other (e.g. neighboring boats) without showing each other's tanks
 
 **Displays**
+- MOBILE APP in development, see https://github.com/bundyzbitz/TankMeshApp
 - Two form factors sharing the same underlying system: a 3.5" mains-powered display and a 2.2"/2.4" battery-portable display (2.4" screen currently untested)
 - Dark-themed UI with per-tank custom colors, consistent across every screen and the web portal
 - Multi-tank overview with color-coded fill bars, and a detailed per-tank graphical view
